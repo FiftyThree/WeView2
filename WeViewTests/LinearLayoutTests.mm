@@ -237,4 +237,128 @@
     }
 }
 
+/** Addresses a case that Bridger found.
+ 
+ 11111111111111111111111111111111
+ 1                              1
+ 1 22222 3333333333333333 44444 1
+ 1 2   2 3              3 4   4 1
+ 1 2   2 3              3 4   4 1
+ 1 2   2 3              3 4   4 1
+ 1 22222 3333333333333333 44444 1
+ 1                              1
+ 11111111111111111111111111111111
+ 
+ Subviews 2 and 4 of WeView 1 have a fixed size (ie. images or buttons).
+ Subview 3 stretches horizontally and vertically and ignores its _horizontal_
+ desired size, but not its vertical.  
+ 
+ Why?  Because Subview 3 contains text, which will wrap.
+ 
+ */
+- (void)testHorizontalLayout_Wrapping2
+{
+    WeView *weview = [[WeView alloc] init];
+    
+    UIView *view0 = [[UIView alloc] init];
+    CGSize view0Size = CGSizeMake(100, 100);
+    view0.size = view0Size;
+    
+    WrappingTestView *view1 = [[WrappingTestView alloc] init];
+    view1.blockSize = CGSizeMake(10, 10);
+    view1.blockCount = 100;
+    [view1 setHStretches];
+    [view1 setIgnoreDesiredWidth:YES];
+    
+    UIView *view2 = [[UIView alloc] init];
+    CGSize view2Size = CGSizeMake(100, 100);
+    view2.size = view2Size;
+    
+    [weview addSubviewsWithHorizontalLayout:@[
+                                              view0,
+                                              view1,
+                                              view2,
+                                              ]];
+    
+    {
+        NSLog(@"x: %@", NSStringFromCGSize([weview sizeThatFits:CGSizeZero]));
+        NSLog(@"x: %@", NSStringFromCGSize([weview sizeThatFits:CGSizeMake(5, 5)]));
+        NSLog(@"x: %@", NSStringFromCGSize([weview sizeThatFits:CGSizeMake(10, 10)]));
+        NSLog(@"x: %@", NSStringFromCGSize([weview sizeThatFits:CGSizeMake(100, 100)]));
+        XCTAssertTrue(CGSizeEqualToSize([weview sizeThatFits:CGSizeZero], CGSizeMake(200, 100)));
+        XCTAssertTrue(CGSizeEqualToSize([weview sizeThatFits:CGSizeMake(5, 5)], CGSizeMake(200, 1000)));
+        XCTAssertTrue(CGSizeEqualToSize([weview sizeThatFits:CGSizeMake(10, 10)], CGSizeMake(200, 1000)));
+        XCTAssertTrue(CGSizeEqualToSize([weview sizeThatFits:CGSizeMake(100, 10)], CGSizeMake(200, 100)));
+    }
+    
+    // CGSizeZero, sizeToFit
+    {
+        weview.size = CGSizeZero;
+        [weview sizeToFit];
+        NSLog(@"w: %@", NSStringFromCGRect(weview.frame));
+        [weview layoutSubviews];
+        NSLog(@"v0: %@", NSStringFromCGRect(view0.frame));
+        NSLog(@"v1: %@", NSStringFromCGRect(view1.frame));
+        NSLog(@"v2: %@", NSStringFromCGRect(view2.frame));
+        XCTAssertTrue(CGSizeEqualToSize(weview.size, CGSizeMake(100, 100)));
+        XCTAssertTrue(CGSizeEqualToSize(view0.size, CGSizeMake(0, 50)));
+        XCTAssertTrue(CGPointEqualToPoint(view0.origin, CGPointMake(100, 100)));
+    }
+    
+    // CGSizeMake(50, 50), sizeToFit
+    {
+        weview.size = CGSizeMake(50, 50);
+        [weview sizeToFit];
+        [weview layoutSubviews];
+        XCTAssertTrue(CGSizeEqualToSize(weview.size, CGSizeMake(0, 10)));
+        XCTAssertTrue(CGSizeEqualToSize(view0.size, CGSizeMake(0, 10)));
+        XCTAssertTrue(CGPointEqualToPoint(view0.origin, CGPointMake(0, 0)));
+    }
+    
+    // CGSizeMake(5, 5)
+    {
+        weview.size = CGSizeMake(5, 5);
+        [weview layoutSubviews];
+        XCTAssertTrue(CGSizeEqualToSize(weview.size, CGSizeMake(5, 5)));
+        XCTAssertTrue(CGSizeEqualToSize(view0.size, CGSizeMake(5, 1000)));
+        XCTAssertTrue(CGPointEqualToPoint(view0.origin, CGPointMake(0, -498)));
+    }
+    
+    // CGSizeMake(10, 10)
+    {
+        weview.size = CGSizeMake(10, 10);
+        [weview layoutSubviews];
+        XCTAssertTrue(CGSizeEqualToSize(weview.size, CGSizeMake(10, 10)));
+        XCTAssertTrue(CGSizeEqualToSize(view0.size, CGSizeMake(10, 1000)));
+        XCTAssertTrue(CGPointEqualToPoint(view0.origin, CGPointMake(0, -495)));
+    }
+    
+    // CGSizeMake(30, 30)
+    {
+        weview.size = CGSizeMake(30, 30);
+        [weview layoutSubviews];
+        XCTAssertTrue(CGSizeEqualToSize(weview.size, CGSizeMake(30, 30)));
+        XCTAssertTrue(CGSizeEqualToSize(view0.size, CGSizeMake(30, 330)));
+        XCTAssertTrue(CGPointEqualToPoint(view0.origin, CGPointMake(0, -150)));
+    }
+    
+    // CGSizeMake(100, 100)
+    {
+        weview.size = CGSizeMake(100, 100);
+        [weview layoutSubviews];
+        XCTAssertTrue(CGSizeEqualToSize(weview.size, CGSizeMake(100, 100)));
+        XCTAssertTrue(CGSizeEqualToSize(view0.size, CGSizeMake(100, 100)));
+        XCTAssertTrue(CGPointEqualToPoint(view0.origin, CGPointMake(0, 0)));
+    }
+    
+    // sizeThatFits:CGSizeMake(100, 0)
+    {
+        weview.size = [weview sizeThatFits:CGSizeMake(100, 0)];
+        [weview layoutSubviews];
+        XCTAssertTrue(CGSizeEqualToSize(weview.size, CGSizeMake(100, 100)));
+        XCTAssertTrue(CGSizeEqualToSize(view0.size, CGSizeMake(100, 100)));
+        XCTAssertTrue(CGPointEqualToPoint(view0.origin, CGPointMake(0, 0)));
+    }
+}
+
 @end
